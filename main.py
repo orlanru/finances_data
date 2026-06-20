@@ -11,6 +11,7 @@ Todas las claves se leen de variables de entorno (Secrets), nunca van en el codi
 """
 
 import os
+import math
 import datetime
 
 import yfinance as yf
@@ -52,11 +53,13 @@ def get_indices():
     for label, symbol in INDICES:
         try:
             t = yf.Ticker(symbol)
+            prev = last = math.nan
             hist = t.history(period="2d")
             if len(hist) >= 2:
                 prev = float(hist["Close"].iloc[-2])
                 last = float(hist["Close"].iloc[-1])
-            else:
+            if math.isnan(prev) or math.isnan(last):
+                # yfinance a veces devuelve closes vacios/NaN; fast_info es el respaldo.
                 info = t.fast_info
                 prev = float(info["previous_close"])
                 last = float(info["last_price"])
@@ -72,7 +75,14 @@ def get_fear_greed():
     """Indice Fear & Greed de CNN. Sin clave, endpoint no oficial."""
     try:
         url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
-        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+        # CNN bloquea con 418 las peticiones sin pinta de navegador real.
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                          "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Referer": "https://www.cnn.com/markets/fear-and-greed",
+        }
+        r = requests.get(url, headers=headers, timeout=15)
         r.raise_for_status()
         d = r.json()["fear_and_greed"]
         score = round(float(d["score"]))
