@@ -2,3 +2,4 @@ yfinance
 feedparser
 requests
 vaderSentiment
+matplotlib

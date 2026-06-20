@@ -1,10 +1,12 @@
-# finances_data — Resumen diario de mercado por Telegram
+# finances_data — Resumen diario de mercado por Telegram + Dashboard web
 
-Bot que envía un resumen diario de mercado por Telegram, con:
+Bot que envía un resumen diario de mercado por Telegram y publica un dashboard web interactivo, con:
 
-- **Índices**: principales índices bursátiles (S&P 500, Nasdaq, Dow Jones, IBEX 35, Euro Stoxx 50), obtenidos con `yfinance` (sin clave).
-- **Sentimiento de mercado**: índice Fear & Greed de CNN (endpoint no oficial, sin clave).
-- **Titulares**: últimas noticias financieras vía feeds RSS (sin clave).
+- **Mercados**: índices (S&P 500, Nasdaq, Dow Jones, IBEX 35, Euro Stoxx 50), volatilidad (VIX), materias primas (oro, petróleo WTI), divisas (EUR/USD) y cripto (Bitcoin), obtenidos con `yfinance` (sin clave).
+- **Sentimiento de mercado**: índice Fear & Greed de CNN, con su desglose por subindicador y el histórico de 1 año (endpoint no oficial, sin clave).
+- **Titulares**: últimas noticias financieras vía feeds RSS, etiquetadas por sentimiento (sin clave).
+- **Gráfico**: imagen con la evolución porcentual del último mes de todos los activos, enviada junto al resumen de texto.
+- **Dashboard web**: página `docs/index.html` con gráficos interactivos (Plotly), que se regenera y publica automáticamente en cada ejecución. Pensada para servirse gratis con GitHub Pages.
 
 Todo se envía por Telegram usando un bot propio, gratis y sin límites de uso.
 
@@ -68,3 +70,14 @@ A diferencia de WhatsApp/Twilio, Telegram no tiene sandbox, ni ventana de 24h, n
 
 - **Opción B**: usar el *Scheduled Deployment* de Replit para ejecutar el script cada día a una hora fija. No expone ninguna URL pública.
 - **Opción C**: disparar la ejecución desde un Atajo de iPhone (Shortcuts) contra un endpoint propio protegido por token.
+
+## Activar el dashboard web (GitHub Pages)
+
+Cada ejecución regenera `docs/index.html` (precios, gráficos interactivos, gauge de Fear & Greed, titulares) y lo deja commiteado en el repo. Para publicarlo gratis como página web, solo hay que activarlo **una vez**:
+
+1. Ve a *Settings → Pages* en GitHub.
+2. En *Build and deployment → Source*, elige **Deploy from a branch**.
+3. Selecciona la rama `main` y la carpeta **`/docs`**, y pulsa *Save*.
+4. En uno o dos minutos, el dashboard estará disponible en `https://<tu-usuario>.github.io/<tu-repo>/` (ej. `https://orlanru.github.io/finances_data/`).
+
+Si cambias de usuario o de nombre de repositorio, actualiza la constante `DASHBOARD_URL` en `main.py` (es la que se incluye al final del mensaje de Telegram).
