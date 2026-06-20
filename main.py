@@ -19,6 +19,7 @@ Cada ejecucion:
 import os
 import io
 import json
+import html
 import math
 import datetime
 
@@ -139,15 +140,17 @@ def get_market_data():
 
 
 def market_lines(data):
+    # parse_mode=HTML: escapamos todo el texto dinamico (las etiquetas llevan '&', '/', etc.).
     lines = []
     for group_name, rows in data:
-        lines.append(f"*{group_name}*")
+        lines.append(f"<b>{html.escape(group_name)}</b>")
         for r in rows:
+            label = html.escape(r["label"])
             if math.isnan(r["last"]) or math.isnan(r["pct"]):
-                lines.append(f"• {r['label']}: s/d")
+                lines.append(f"• {label}: s/d")
             else:
                 arrow = "🟢▲" if r["pct"] >= 0 else "🔴▼"
-                lines.append(f"{arrow} {r['label']}: {format_price(r['last'])} ({r['pct']:+.2f}%)")
+                lines.append(f"{arrow} {label}: {format_price(r['last'])} ({r['pct']:+.2f}%)")
         lines.append("")
     return lines
 
@@ -197,8 +200,8 @@ def get_fear_greed():
 def fear_greed_lines(fg):
     if not fg:
         return []
-    lines = ["*Sentimiento de mercado*"]
-    lines.append(f"😨↔️🤑 Fear & Greed: {fg['score']}/100 ({fg['rating']})")
+    lines = ["<b>Sentimiento de mercado</b>"]
+    lines.append(f"😨↔️🤑 Fear &amp; Greed: {fg['score']}/100 ({html.escape(fg['rating'])})")
     lines.append(
         f"   Ayer {fg['previous_close']} · Semana pasada {fg['previous_1_week']} · "
         f"Mes pasado {fg['previous_1_month']}"
@@ -236,15 +239,16 @@ def get_news():
 def news_lines(items):
     if not items:
         return ["• Sin titulares disponibles ahora."]
-    return [f"{it['tag']} {it['title']}" for it in items]
+    # Titulares de feeds externos: se escapan para no romper el parse_mode=HTML.
+    return [f"{it['tag']} {html.escape(it['title'])}" for it in items]
 
 
 def build_message(data, fg, news_items):
     today = datetime.datetime.now().strftime("%d/%m/%Y")
-    parts = [f"📊 *Resumen de mercado* — {today}", ""]
+    parts = [f"📊 <b>Resumen de mercado</b> — {today}", ""]
     parts += market_lines(data)
     parts += fear_greed_lines(fg)
-    parts.append("*Titulares*")
+    parts.append("<b>Titulares</b>")
     parts += news_lines(news_items)
     parts.append("")
     parts.append(f"🌐 Dashboard completo: {DASHBOARD_URL}")
@@ -290,7 +294,12 @@ def send(msg):
         try:
             r = requests.post(
                 url,
-                data={"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"},
+                data={
+                    "chat_id": chat_id,
+                    "text": msg,
+                    "parse_mode": "HTML",
+                    "disable_web_page_preview": True,
+                },
                 timeout=15,
             )
             r.raise_for_status()
@@ -490,7 +499,7 @@ def build_html(data, fg, news_items):
       const tagSpan = document.createElement('span');
       tagSpan.textContent = n.tag;
       const link = document.createElement('a');
-      link.href = /^https?:\/\//.test(n.link) ? n.link : '#';
+      link.href = (typeof n.link === 'string' && n.link.startsWith('http')) ? n.link : '#';
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
       link.textContent = n.title;
