@@ -1,13 +1,13 @@
 """
-Resumen diario de mercado -> WhatsApp (via Twilio)
+Resumen diario de mercado -> Telegram
 
 Datos:
   - Indices: yfinance (sin clave)
   - Sentimiento de mercado: indice Fear & Greed de CNN (sin clave, no oficial)
   - Titulares: feeds RSS financieros (sin clave)
 
-La UNICA credencial necesaria es la de Twilio. Todo lo demas es sin registro.
-Todas las claves se leen de variables de entorno (Secrets de Replit), nunca van en el codigo.
+La UNICA credencial necesaria es el token del bot de Telegram. Todo lo demas es sin registro.
+Todas las claves se leen de variables de entorno (Secrets), nunca van en el codigo.
 """
 
 import os
@@ -16,7 +16,6 @@ import datetime
 import yfinance as yf
 import feedparser
 import requests
-from twilio.rest import Client
 
 # Sentimiento de titulares (offline, sin clave). Si no esta instalado, se omite.
 try:
@@ -27,13 +26,9 @@ except Exception:
 
 
 # ------------------- Configuracion (desde Secrets) -------------------
-TWILIO_SID = os.environ["TWILIO_ACCOUNT_SID"]
-TWILIO_TOKEN = os.environ["TWILIO_AUTH_TOKEN"]
-# Numero del sandbox de Twilio. Confirmalo en tu consola (suele ser este).
-TWILIO_FROM = os.environ.get("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886")
-# Uno o varios destinatarios en formato internacional, separados por coma.
-# Ej: +34600111222,+34600333444
-RECIPIENTS = [n.strip() for n in os.environ["WHATSAPP_TO"].split(",") if n.strip()]
+TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
+# Uno o varios chat_id de Telegram, separados por coma.
+CHAT_IDS = [c.strip() for c in os.environ["TELEGRAM_CHAT_ID"].split(",") if c.strip()]
 
 # Indices a seguir: (etiqueta, simbolo de Yahoo Finance). Edita a tu gusto.
 INDICES = [
@@ -129,20 +124,23 @@ def build_message():
     parts += get_news()
 
     msg = "\n".join(parts)
-    # Twilio/WhatsApp: limite de 1600 caracteres por mensaje.
-    return msg[:1550]
+    # Telegram: limite de 4096 caracteres por mensaje.
+    return msg[:4000]
 
 
 def send(msg):
-    client = Client(TWILIO_SID, TWILIO_TOKEN)
-    for number in RECIPIENTS:
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    for chat_id in CHAT_IDS:
         try:
-            client.messages.create(from_=TWILIO_FROM, to=f"whatsapp:{number}", body=msg)
-            print(f"Enviado a {number}")
+            r = requests.post(
+                url,
+                data={"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"},
+                timeout=15,
+            )
+            r.raise_for_status()
+            print(f"Enviado a {chat_id}")
         except Exception as e:
-            print(f"No se pudo enviar a {number}: {e}")
-            print("Si es por la ventana de 24h, responde cualquier mensaje "
-                  "al bot del sandbox y vuelve a ejecutarlo.")
+            print(f"No se pudo enviar a {chat_id}: {e}")
 
 
 def run_digest():
