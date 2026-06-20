@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard de mercado</title>
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px; background: #0f1117; color: #e6e6e6;
+    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  }
+  h1 { font-size: 1.6rem; margin-bottom: 0; }
+  .subtitle { color: #9aa0ab; margin-top: 4px; margin-bottom: 24px; }
+  h2 { font-size: 1.1rem; border-left: 4px solid #4FC3F7; padding-left: 10px; margin-top: 36px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+  .card {
+    background: #171a23; border-radius: 12px; padding: 14px 16px;
+    border: 1px solid #262b38;
+  }
+  .card .group { font-size: 0.72rem; color: #767d8a; text-transform: uppercase; letter-spacing: .05em; }
+  .card .label { font-size: 1rem; font-weight: 600; margin: 2px 0 8px; }
+  .card .price { font-size: 1.3rem; font-weight: 700; }
+  .pct-up { color: #4caf50; }
+  .pct-down { color: #f44336; }
+  .spark { height: 50px; margin-top: 6px; }
+  .fg-wrap { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+  .fg-gauge, .fg-hist { flex: 1 1 320px; min-width: 280px; height: 280px; }
+  .sub-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-top: 12px; }
+  .sub-card { background: #171a23; border: 1px solid #262b38; border-radius: 10px; padding: 10px 12px; font-size: 0.85rem; }
+  .sub-card .score { font-size: 1.1rem; font-weight: 700; }
+  .news-list { list-style: none; padding: 0; margin-top: 12px; }
+  .news-list li {
+    background: #171a23; border: 1px solid #262b38; border-radius: 10px;
+    padding: 10px 14px; margin-bottom: 8px; display: flex; gap: 10px; align-items: baseline;
+  }
+  .news-list a { color: #e6e6e6; text-decoration: none; }
+  .news-list a:hover { text-decoration: underline; }
+  footer { margin-top: 40px; color: #767d8a; font-size: 0.8rem; }
+  footer a { color: #4FC3F7; }
+</style>
+</head>
+<body>
+  <h1>📊 Dashboard de mercado</h1>
+  <div class="subtitle">Actualizado 20/06/2026 13:38</div>
+
+  <h2>Mercados</h2>
+  <div class="grid" id="assets-grid"></div>
+
+  <h2>Sentimiento de mercado — Fear &amp; Greed (CNN)</h2>
+  <div class="fg-wrap">
+    <div id="fg-gauge" class="fg-gauge"></div>
+    <div id="fg-hist" class="fg-hist"></div>
+  </div>
+  <div class="sub-grid" id="fg-subindicators"></div>
+
+  <h2>Titulares</h2>
+  <ul class="news-list" id="news-list"></ul>
+
+  <footer>
+    Generado automaticamente cada dia por GitHub Actions ·
+    <a href="https://github.com/orlanru/finances_data" target="_blank">codigo fuente</a>
+  </footer>
+
+<script type="application/json" id="dashboard-data">{"assets": [{"group": "Indices", "label": "S&P 500", "last": 7500.5801, "pct": 1.08, "closes": [7353.60986328125, 7432.97021484375, 7445.72021484375, 7473.47021484375, 7519.1201171875, 7520.35986328125, 7563.6298828125, 7580.06005859375, 7599.9599609375, 7609.77978515625, 7553.68017578125, 7584.31005859375, 7383.740234375, 7405.72998046875, 7386.64990234375, 7266.990234375, 7394.2998046875, 7431.4599609375, 7554.2900390625, 7511.35009765625, 7420.10009765625, 7500.580078125]}, {"group": "Indices", "label": "Nasdaq", "last": 26517.9297, "pct": 1.91, "closes": [25870.7109375, 26270.359375, 26293.099609375, 26343.970703125, 26656.1796875, 26674.73046875, 26917.470703125, 26972.619140625, 27086.810546875, 27093.900390625, 26853.98046875, 26830.9609375, 25709.4296875, 25929.66015625, 25678.8203125, 25169.5, 25809.66015625, 25888.83984375, 26683.939453125, 26376.33984375, 26021.66015625, 26517.9296875]}, {"group": "Indices", "label": "Dow Jones", "last": 51564.6992, "pct": 0.14, "closes": [49363.87890625, 50009.3515625, 50285.66015625, 50579.69921875, 50461.6796875, 50644.28125, 50668.96875, 51032.4609375, 51078.87890625, 51307.7890625, 50687.0703125, 51561.9296875, 50866.78125, 50786.01171875, 50872.109375, 49918.78125, 50848.75, 51202.26171875, 51671.03125, 51999.671875, 51492.55078125, 51564.69921875]}, {"group": "Indices", "label": "IBEX 35", "last": 19347.4004, "pct": -0.29, "closes": [17670.099609375, 18051.69921875, 17975.19921875, 17985.30078125, 18387.400390625, 18290.900390625, 18380.900390625, 18279.30078125, 18362.900390625, 18184.900390625, 18272.0, 18176.0, 18276.0, 18344.900390625, 18223.099609375, 18174.69921875, 18142.69921875, 18290.099609375, 18764.400390625, 19032.0, 19163.599609375, 19421.900390625, 19404.099609375, 19347.400390625]}, {"group": "Indices", "label": "Euro Stoxx 50", "last": 6293.1299, "pct": -0.48, "closes": [5851.16015625, 5976.06982421875, 5960.31982421875, 6019.4501953125, 6064.14990234375, 6070.5400390625, 6055.10986328125, 6050.5400390625, 6034.9501953125, 6107.85009765625, 6053.56982421875, 6103.330078125, 6062.06982421875, 6062.2900390625, 6049.740234375, 6009.9501953125, 6056.9599609375, 6187.6298828125, 6229.43017578125, 6257.419921875, 6300.06982421875, 6323.27001953125, 6293.1298828125]}, {"group": "Volatilidad", "label": "VIX", "last": 16.4, "pct": -11.06, "closes": [18.059999465942383, 17.440000534057617, 16.760000228881836, 16.700000762939453, 16.59000015258789, 17.010000228881836, 16.290000915527344, 15.739999771118164, 15.319999694824219, 16.049999237060547, 15.770000457763672, 16.059999465942383, 15.399999618530273, 21.510000228881836, 18.920000076293945, 19.8700008392334, 22.219999313354492, 19.440000534057617, 17.68000030517578, 16.200000762939453, 16.40999984741211, 18.440000534057617, 16.399999618530273]}, {"group": "Materias primas", "label": "Oro", "last": 4172.8999, "pct": -1.21, "closes": [4506.2998046875, 4531.2998046875, 4539.7998046875, 4521.0, 4500.39990234375, 4447.5, 4499.2998046875, 4560.5, 4475.2001953125, 4489.10009765625, 4436.7001953125, 4475.7998046875, 4337.10009765625, 4335.89990234375, 4260.0, 4108.2001953125, 4090.300048828125, 4215.0, 4328.0, 4330.89990234375, 4358.89990234375, 4224.10009765625, 4172.89990234375]}, {"group": "Materias primas", "label": "Petroleo WTI", "last": 76.54, "pct": -0.08, "closes": [107.7699966430664, 98.26000213623047, 96.3499984741211, 96.5999984741211, 93.88999938964844, 88.68000030517578, 88.9000015258789, 87.36000061035156, 92.16000366210938, 93.76000213623047, 96.0199966430664, 93.04000091552734, 90.54000091552734, 91.30000305175781, 88.19999694824219, 90.02999877929688, 87.70999908447266, 84.87999725341797, 80.75, 76.05000305175781, 76.79000091552734, 76.5999984741211, 76.54000091552734]}, {"group": "Divisas", "label": "EUR/USD", "last": 1.1469, "pct": -0.33, "closes": [1.1655147075653076, 1.1607122421264648, 1.1625338792800903, 1.1621150970458984, 1.164225697517395, 1.1637378931045532, 1.1636837720870972, 1.1617909669876099, 1.1652837991714478, 1.164890170097351, 1.1635483503341675, 1.1622096300125122, 1.160941243171692, 1.1612648963928223, 1.1522595882415771, 1.1528440713882446, 1.1535356044769287, 1.1535621881484985, 1.157594919204712, 1.1603081226348877, 1.1594202518463135, 1.1609952449798584, 1.150734782218933, 1.1469204425811768]}, {"group": "Cripto", "label": "Bitcoin", "last": 63378.3516, "pct": -0.26, "closes": [77457.7734375, 77539.171875, 75488.2421875, 76673.3671875, 76981.125, 77279.9296875, 75825.734375, 74344.703125, 73536.5546875, 73372.5234375, 73754.8359375, 73579.6875, 71319.7734375, 66703.65625, 64014.3671875, 63801.57421875, 60922.66796875, 60867.4140625, 63239.51953125, 63090.58984375, 61643.78125, 61449.2890625, 63561.0546875, 63543.19921875, 64421.32421875, 65710.3984375, 66289.5, 65600.640625, 62896.47265625, 63540.8359375, 63378.3515625]}], "fearGreed": {"score": 37, "rating": "Fear", "previous_close": 38, "previous_1_week": 36, "previous_1_month": 59, "previous_1_year": 54, "history": [[1750377600000, 54.5], [1750636800000, 56.6], [1750723200000, 57.9], [1750809600000, 59.3], [1750896000000, 63.0], [1750982400000, 64.8], [1751241600000, 69.2], [1751328000000, 67.5], [1751414400000, 63.7], [1751500800000, 77.6], [1751846400000, 75.1], [1751932800000, 74.6], [1752019200000, 75.9], [1752105600000, 77.0], [1752192000000, 75.3], [1752451200000, 76.1], [1752537600000, 73.5], [1752624000000, 72.9], [1752710400000, 74.2], [1752796800000, 73.9], [1753056000000, 73.3], [1753142400000, 73.9], [1753228800000, 76.4], [1753315200000, 75.3], [1753401600000, 74.7], [1753660800000, 73.8], [1753747200000, 70.6], [1753833600000, 68.0], [1753920000000, 63.7], [1754006400000, 49.8], [1754265600000, 56.9], [1754352000000, 55.0], [1754438400000, 55.3], [1754524800000, 54.7], [1754611200000, 58.4], [1754870400000, 57.6], [1754956800000, 62.3], [1755043200000, 63.3], [1755129600000, 63.3], [1755216000000, 63.5], [1755475200000, 64.2], [1755561600000, 59.9], [1755648000000, 55.9], [1755734400000, 52.6], [1755820800000, 55.5], [1756080000000, 53.9], [1756166400000, 55.4], [1756252800000, 59.1], [1756339200000, 64.4], [1756425600000, 61.5], [1756771200000, 62.5], [1756857600000, 61.4], [1756944000000, 61.2], [1757030400000, 58.7], [1757289600000, 58.2], [1757376000000, 57.9], [1757462400000, 57.9], [1757548800000, 60.3], [1757635200000, 61.3], [1757894400000, 64.5], [1757980800000, 64.4], [1758067200000, 63.8], [1758153600000, 66.5], [1758240000000, 66.2], [1758499200000, 66.5], [1758585600000, 56.8], [1758672000000, 54.6], [1758758400000, 50.7], [1758844800000, 51.3], [1759104000000, 51.0], [1759190400000, 51.4], [1759276800000, 52.5], [1759363200000, 54.5], [1759449600000, 52.6], [1759708800000, 54.0], [1759795200000, 51.9], [1759881600000, 52.9], [1759968000000, 48.6], [1760054400000, 30.1], [1760313600000, 29.7], [1760400000000, 28.3], [1760486400000, 27.4], [1760572800000, 23.1], [1760659200000, 22.3], [1760918400000, 29.9], [1761004800000, 28.5], [1761091200000, 26.4], [1761177600000, 27.6], [1761264000000, 32.5], [1761523200000, 37.3], [1761609600000, 39.3], [1761696000000, 42.1], [1761782400000, 37.1], [1761868800000, 34.5], [1762128000000, 32.6], [1762214400000, 20.9], [1762300800000, 23.1], [1762387200000, 24.3], [1762473600000, 20.4], [1762732800000, 29.9], [1762819200000, 30.5], [1762905600000, 34.6], [1762992000000, 24.5], [1763078400000, 22.1], [1763337600000, 11.6], [1763424000000, 8.9], [1763510400000, 7.9], [1763596800000, 5.2], [1763683200000, 5.7], [1763942400000, 13.7], [1764028800000, 15.0], [1764115200000, 17.7], [1764288000000, 21.8], [1764547200000, 22.1], [1764633600000, 23.3], [1764720000000, 24.8], [1764806400000, 36.0], [1764892800000, 38.1], [1765152000000, 40.8], [1765238400000, 40.9], [1765324800000, 36.4], [1765411200000, 43.7], [1765497600000, 39.3], [1765756800000, 49.3], [1765843200000, 46.4], [1765929600000, 37.7], [1766016000000, 42.4], [1766102400000, 44.2], [1766361600000, 54.9], [1766448000000, 58.6], [1766534400000, 58.0], [1766707200000, 54.9], [1766966400000, 47.9], [1767052800000, 46.1], [1767139200000, 43.3], [1767312000000, 45.2], [1767571200000, 47.6], [1767657600000, 52.9], [1767744000000, 48.6], [1767830400000, 48.4], [1767916800000, 54.1], [1768176000000, 58.0], [1768262400000, 59.1], [1768348800000, 58.6], [1768435200000, 63.7], [1768521600000, 63.8], [1768867200000, 50.9], [1768953600000, 53.9], [1769040000000, 54.8], [1769126400000, 54.9], [1769385600000, 57.7], [1769472000000, 65.0], [1769558400000, 65.5], [1769644800000, 63.8], [1769731200000, 58.6], [1769990400000, 63.4], [1770076800000, 43.3], [1770163200000, 47.2], [1770249600000, 34.9], [1770336000000, 45.4], [1770595200000, 48.5], [1770681600000, 47.2], [1770768000000, 49.9], [1770854400000, 36.4], [1770940800000, 33.8], [1771286400000, 33.3], [1771372800000, 34.2], [1771459200000, 34.4], [1771545600000, 42.3], [1771804800000, 32.5], [1771891200000, 40.3], [1771977600000, 43.1], [1772064000000, 42.9], [1772150400000, 41.2], [1772409600000, 34.3], [1772496000000, 31.6], [1772582400000, 33.1], [1772668800000, 31.6], [1772755200000, 25.3], [1773014400000, 22.2], [1773100800000, 20.3], [1773187200000, 18.3], [1773360000000, 16.7], [1773619200000, 23.9], [1773705600000, 22.9], [1773792000000, 13.6], [1773878400000, 18.3], [1773964800000, 8.4], [1774224000000, 11.6], [1774310400000, 10.4], [1774396800000, 16.5], [1774483200000, 10.3], [1774569600000, 8.2], [1774828800000, 5.8], [1774915200000, 14.9], [1775001600000, 15.9], [1775088000000, 18.3], [1775433600000, 21.9], [1775520000000, 21.6], [1775606400000, 29.2], [1775692800000, 33.8], [1775779200000, 38.1], [1776038400000, 41.0], [1776124800000, 47.3], [1776211200000, 56.2], [1776297600000, 61.5], [1776384000000, 68.6], [1776643200000, 70.0], [1776729600000, 67.6], [1776816000000, 68.5], [1776902400000, 66.2], [1776988800000, 65.4], [1777248000000, 66.3], [1777334400000, 67.4], [1777420800000, 66.2], [1777507200000, 69.5], [1777593600000, 71.2], [1777852800000, 66.9], [1777939200000, 67.3], [1778025600000, 68.7], [1778112000000, 66.4], [1778198400000, 66.7], [1778457600000, 65.4], [1778544000000, 65.1], [1778630400000, 64.0], [1778716800000, 65.0], [1778803200000, 63.0], [1779062400000, 61.5], [1779148800000, 59.4], [1779235200000, 60.2], [1779321600000, 57.9], [1779408000000, 59.0], [1779753600000, 60.9], [1779840000000, 60.5], [1779926400000, 60.0], [1780012800000, 59.5], [1780272000000, 56.5], [1780358400000, 56.1], [1780444800000, 53.0], [1780531200000, 53.9], [1780617600000, 41.8], [1780876800000, 39.9], [1780963200000, 32.4], [1781049600000, 26.9], [1781136000000, 31.6], [1781222400000, 35.5], [1781481600000, 41.6], [1781568000000, 39.1], [1781654400000, 32.2], [1781740800000, 37.3], [1781827200000, 37.3], [1781830787000, 37.3]], "subindicators": [{"label": "Momentum del S&P 500", "score": 73.4, "rating": "Greed"}, {"label": "Fortaleza de precios", "score": 36.8, "rating": "Fear"}, {"label": "Amplitud de precios", "score": 17.0, "rating": "Extreme fear"}, {"label": "Opciones put/call", "score": 42.0, "rating": "Fear"}, {"label": "Volatilidad (VIX)", "score": 50.0, "rating": "Neutral"}, {"label": "Demanda de bonos basura", "score": 9.4, "rating": "Extreme fear"}, {"label": "Demanda de refugio seguro", "score": 32.2, "rating": "Fear"}]}, "news": [{"title": "The riskiest SpaceX stock trade of all had a big first week", "link": "https://www.cnbc.com/2026/06/19/spacex-stock-risk-buy-sell.html", "tag": "🔴"}, {"title": "The average SpaceX buyer post-IPO is almost under water after two-day slide", "link": "https://www.cnbc.com/2026/06/18/the-average-spacex-buyer-post-ipo-is-almost-under-water-after-two-day-slide.html", "tag": "🟡"}, {"title": "Markets are set for a much more hawkish Warsh Fed than expected", "link": "https://www.cnbc.com/2026/06/18/markets-are-set-for-a-much-more-hawkish-warsh-fed-than-expected.html", "tag": "🟡"}, {"title": "Jeffrey Gundlach says Fed's Warsh is not going to be the 'easy money' chairman many hoped for", "link": "https://www.cnbc.com/2026/06/17/jeffrey-gundlach-says-feds-warsh-is-not-going-to-be-the-easy-money-chairman-many-hoped-for.html", "tag": "🟢"}, {"title": "Chairman Warsh abstains from giving rate forecast as several members signal a hike in 2026", "link": "https://www.cnbc.com/2026/06/17/fed-projections-call-for-a-rate-hike-in-2026-but-chairman-warsh-likely-abstained.html", "tag": "🟢"}]}</script>
+<script>
+  const DATA = JSON.parse(document.getElementById('dashboard-data').textContent);
+
+  const grid = document.getElementById('assets-grid');
+  DATA.assets.forEach((a, i) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    const pctOk = a.pct !== null;
+    const pctClass = pctOk ? (a.pct >= 0 ? 'pct-up' : 'pct-down') : '';
+    const pctText = pctOk ? `${a.pct >= 0 ? '▲' : '▼'} ${a.pct.toFixed(2)}%` : 's/d';
+    const priceText = a.last !== null ? a.last.toLocaleString('es-ES', {maximumFractionDigits: a.last >= 1000 ? 0 : (a.last >= 10 ? 2 : 4)}) : 's/d';
+    card.innerHTML = `
+      <div class="group">${a.group}</div>
+      <div class="label">${a.label}</div>
+      <div class="price">${priceText} <span class="${pctClass}">${pctText}</span></div>
+      <div class="spark" id="spark-${i}"></div>
+    `;
+    grid.appendChild(card);
+
+    if (a.closes && a.closes.length > 1) {
+      const up = a.closes[a.closes.length - 1] >= a.closes[0];
+      Plotly.newPlot(`spark-${i}`, [{
+        y: a.closes, type: 'scatter', mode: 'lines', line: { color: up ? '#4caf50' : '#f44336', width: 2 },
+        fill: 'tozeroy', fillcolor: up ? 'rgba(76,175,80,0.08)' : 'rgba(244,67,54,0.08)',
+      }], {
+        margin: { l: 0, r: 0, t: 0, b: 0 }, paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+        xaxis: { visible: false }, yaxis: { visible: false },
+      }, { displayModeBar: false, responsive: true });
+    }
+  });
+
+  const fg = DATA.fearGreed || {};
+  if (fg.score !== undefined) {
+    Plotly.newPlot('fg-gauge', [{
+      type: 'indicator', mode: 'gauge+number',
+      value: fg.score,
+      title: { text: fg.rating || '', font: { color: '#e6e6e6', size: 16 } },
+      number: { font: { color: '#e6e6e6' } },
+      gauge: {
+        axis: { range: [0, 100], tickcolor: '#9aa0ab' },
+        bar: { color: '#4FC3F7' },
+        bgcolor: 'transparent',
+        steps: [
+          { range: [0, 25], color: '#b71c1c' },
+          { range: [25, 45], color: '#e65100' },
+          { range: [45, 55], color: '#616161' },
+          { range: [55, 75], color: '#33691e' },
+          { range: [75, 100], color: '#1b5e20' },
+        ],
+      },
+    }], { paper_bgcolor: 'transparent', font: { color: '#e6e6e6' }, margin: { t: 40, b: 10 } },
+       { displayModeBar: false, responsive: true });
+  }
+
+  if (fg.history && fg.history.length) {
+    const x = fg.history.map(p => new Date(p[0]));
+    const y = fg.history.map(p => p[1]);
+    Plotly.newPlot('fg-hist', [{
+      x, y, type: 'scatter', mode: 'lines', line: { color: '#FFD54F', width: 2 },
+    }], {
+      title: { text: 'Ultimo ano', font: { color: '#e6e6e6', size: 13 } },
+      paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+      font: { color: '#9aa0ab' },
+      xaxis: { gridcolor: '#262b38' }, yaxis: { range: [0, 100], gridcolor: '#262b38' },
+      margin: { t: 40, l: 30, r: 10, b: 30 },
+    }, { displayModeBar: false, responsive: true });
+  }
+
+  const subGrid = document.getElementById('fg-subindicators');
+  (fg.subindicators || []).forEach(s => {
+    const card = document.createElement('div');
+    card.className = 'sub-card';
+    card.innerHTML = `<div>${s.label}</div><div class="score">${s.score} · ${s.rating}</div>`;
+    subGrid.appendChild(card);
+  });
+
+  const newsList = document.getElementById('news-list');
+  if (DATA.news && DATA.news.length) {
+    // Los titulares vienen de feeds RSS externos: se insertan como texto, nunca como HTML.
+    DATA.news.forEach(n => {
+      const li = document.createElement('li');
+      const tagSpan = document.createElement('span');
+      tagSpan.textContent = n.tag;
+      const link = document.createElement('a');
+      link.href = (typeof n.link === 'string' && n.link.startsWith('http')) ? n.link : '#';
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = n.title;
+      li.appendChild(tagSpan);
+      li.appendChild(link);
+      newsList.appendChild(li);
+    });
+  } else {
+    const li = document.createElement('li');
+    li.textContent = 'Sin titulares disponibles ahora.';
+    newsList.appendChild(li);
+  }
+</script>
+</body>
+</html>

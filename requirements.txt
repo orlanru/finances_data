@@ -1,5 +1,5 @@
 yfinance
 feedparser
 requests
-twilio
 vaderSentiment
+matplotlib
