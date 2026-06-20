@@ -60,5 +60,15 @@ En el sandbox de Twilio, los envíos automáticos solo llegan si están dentro d
 
 ## Programarlo a diario
 
-- **Opción A**: usar el *Scheduled Deployment* de Replit para ejecutar el script cada día a una hora fija. No expone ninguna URL pública.
-- **Opción B**: disparar la ejecución desde un Atajo de iPhone (Shortcuts) contra un endpoint propio protegido por token.
+- **Opción A (recomendada): GitHub Actions.** El repo incluye `.github/workflows/daily-digest.yml`, que ejecuta `main.py` automáticamente todos los días a las 08:00 UTC y además se puede disparar manualmente en cualquier momento. Es gratis, no requiere ningún servidor ni Repl encendido, y los secretos viven en el propio repo de GitHub.
+
+  1. Ve a *Settings → Secrets and variables → Actions* en GitHub y añade las cuatro variables (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM`, `WHATSAPP_TO`) como *Repository secrets*.
+  2. El workflow ya queda activo con el push a `main`; se ejecutará solo cada día a la hora configurada.
+  3. Para ajustar la hora, edita la línea `cron: "0 8 * * *"` (formato UTC, minuto hora * * *).
+  4. Para lanzarlo manualmente "a consulta" (sin esperar al schedule):
+     - Desde la web: pestaña *Actions → Daily market digest → Run workflow*.
+     - Desde la terminal, con [GitHub CLI](https://cli.github.com/) autenticado: `gh workflow run daily-digest.yml`.
+     - Los logs de cada ejecución (programada o manual) quedan en la pestaña *Actions*.
+
+- **Opción B**: usar el *Scheduled Deployment* de Replit para ejecutar el script cada día a una hora fija. No expone ninguna URL pública.
+- **Opción C**: disparar la ejecución desde un Atajo de iPhone (Shortcuts) contra un endpoint propio protegido por token.
