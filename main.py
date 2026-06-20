@@ -329,26 +329,7 @@ def _json_for_html(obj):
     return json.dumps(obj, ensure_ascii=False).replace("</", "<\\/")
 
 
-def build_html(data, fg, news_items):
-    today = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
-
-    assets_json = []
-    for group_name, rows in data:
-        for r in rows:
-            assets_json.append({
-                "group": group_name,
-                "label": r["label"],
-                "last": None if math.isnan(r["last"]) else round(r["last"], 4),
-                "pct": None if math.isnan(r["pct"]) else round(r["pct"], 2),
-                "closes": r["closes"],
-            })
-
-    fg_json = fg or {}
-    news_json = news_items
-
-    payload = _json_for_html({"assets": assets_json, "fearGreed": fg_json, "news": news_json})
-
-    html = f"""<!DOCTYPE html>
+_HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="utf-8">
@@ -356,169 +337,220 @@ def build_html(data, fg, news_items):
 <title>Dashboard de mercado</title>
 <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
 <style>
-  :root {{ color-scheme: dark; }}
-  * {{ box-sizing: border-box; }}
-  body {{
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
     margin: 0; padding: 24px; background: #0f1117; color: #e6e6e6;
     font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  }}
-  h1 {{ font-size: 1.6rem; margin-bottom: 0; }}
-  .subtitle {{ color: #9aa0ab; margin-top: 4px; margin-bottom: 24px; }}
-  h2 {{ font-size: 1.1rem; border-left: 4px solid #4FC3F7; padding-left: 10px; margin-top: 36px; }}
-  .grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }}
-  .card {{
+  }
+  h1 { font-size: 1.6rem; margin-bottom: 0; }
+  .subtitle { color: #9aa0ab; margin-top: 4px; margin-bottom: 24px; }
+  h2 { font-size: 1.1rem; border-left: 4px solid #4FC3F7; padding-left: 10px; margin-top: 36px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+  .card {
     background: #171a23; border-radius: 12px; padding: 14px 16px;
     border: 1px solid #262b38;
-  }}
-  .card .group {{ font-size: 0.72rem; color: #767d8a; text-transform: uppercase; letter-spacing: .05em; }}
-  .card .label {{ font-size: 1rem; font-weight: 600; margin: 2px 0 8px; }}
-  .card .price {{ font-size: 1.3rem; font-weight: 700; }}
-  .pct-up {{ color: #4caf50; }}
-  .pct-down {{ color: #f44336; }}
-  .spark {{ height: 50px; margin-top: 6px; }}
-  .fg-wrap {{ display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }}
-  .fg-gauge, .fg-hist {{ flex: 1 1 320px; min-width: 280px; height: 280px; }}
-  .sub-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-top: 12px; }}
-  .sub-card {{ background: #171a23; border: 1px solid #262b38; border-radius: 10px; padding: 10px 12px; font-size: 0.85rem; }}
-  .sub-card .score {{ font-size: 1.1rem; font-weight: 700; }}
-  .news-list {{ list-style: none; padding: 0; margin-top: 12px; }}
-  .news-list li {{
+  }
+  .card .group { font-size: 0.72rem; color: #767d8a; text-transform: uppercase; letter-spacing: .05em; }
+  .card .label { font-size: 1rem; font-weight: 600; margin: 2px 0 8px; }
+  .card .price { font-size: 1.3rem; font-weight: 700; }
+  .pct-up { color: #4caf50; }
+  .pct-down { color: #f44336; }
+  .spark { height: 50px; margin-top: 6px; }
+  .fg-summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; margin-top: 12px; }
+  .fg-score { font-size: 2.6rem; font-weight: 800; color: #FFD54F; line-height: 1; }
+  .fg-max { font-size: 1rem; font-weight: 500; color: #767d8a; }
+  .fg-rating { font-size: 1.1rem; font-weight: 600; }
+  .fg-prev { width: 100%; color: #9aa0ab; font-size: 0.85rem; }
+  .fg-wrap { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; margin-top: 16px; }
+  .fg-gauge, .fg-hist { flex: 1 1 320px; min-width: 280px; height: 280px; }
+  .chart-ph { color: #4a505c; font-size: 0.8rem; }
+  .sub-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-top: 12px; }
+  .sub-card { background: #171a23; border: 1px solid #262b38; border-radius: 10px; padding: 10px 12px; font-size: 0.85rem; }
+  .sub-card .score { font-size: 1.1rem; font-weight: 700; }
+  .news-list { list-style: none; padding: 0; margin-top: 12px; }
+  .news-list li {
     background: #171a23; border: 1px solid #262b38; border-radius: 10px;
     padding: 10px 14px; margin-bottom: 8px; display: flex; gap: 10px; align-items: baseline;
-  }}
-  .news-list a {{ color: #e6e6e6; text-decoration: none; }}
-  .news-list a:hover {{ text-decoration: underline; }}
-  footer {{ margin-top: 40px; color: #767d8a; font-size: 0.8rem; }}
-  footer a {{ color: #4FC3F7; }}
+  }
+  .news-list a { color: #e6e6e6; text-decoration: none; }
+  .news-list a:hover { text-decoration: underline; }
+  footer { margin-top: 40px; color: #767d8a; font-size: 0.8rem; }
+  footer a { color: #4FC3F7; }
 </style>
 </head>
 <body>
   <h1>📊 Dashboard de mercado</h1>
-  <div class="subtitle">Actualizado {today}</div>
+  <div class="subtitle">Actualizado __TODAY__</div>
 
   <h2>Mercados</h2>
-  <div class="grid" id="assets-grid"></div>
+  <div class="grid">__CARDS__</div>
 
   <h2>Sentimiento de mercado — Fear &amp; Greed (CNN)</h2>
-  <div class="fg-wrap">
-    <div id="fg-gauge" class="fg-gauge"></div>
-    <div id="fg-hist" class="fg-hist"></div>
-  </div>
-  <div class="sub-grid" id="fg-subindicators"></div>
+  __FG_SECTION__
 
   <h2>Titulares</h2>
-  <ul class="news-list" id="news-list"></ul>
+  <ul class="news-list">__NEWS__</ul>
 
   <footer>
     Generado automaticamente cada dia por GitHub Actions ·
     <a href="https://github.com/orlanru/finances_data" target="_blank">codigo fuente</a>
   </footer>
 
-<script type="application/json" id="dashboard-data">{payload}</script>
+<!-- Todo el contenido de arriba ya esta escrito en el HTML: se ve sin JavaScript.
+     Los graficos de abajo son un extra que solo se anade si Plotly carga. -->
+<script id="charts-data" type="application/json">__CHARTS_JSON__</script>
 <script>
-  const DATA = JSON.parse(document.getElementById('dashboard-data').textContent);
+(function () {
+  if (typeof Plotly === 'undefined') return;   // sin Plotly se sigue viendo todo el texto
+  var C;
+  try { C = JSON.parse(document.getElementById('charts-data').textContent); }
+  catch (e) { return; }
 
-  const grid = document.getElementById('assets-grid');
-  DATA.assets.forEach((a, i) => {{
-    const card = document.createElement('div');
-    card.className = 'card';
-    const pctOk = a.pct !== null;
-    const pctClass = pctOk ? (a.pct >= 0 ? 'pct-up' : 'pct-down') : '';
-    const pctText = pctOk ? `${{a.pct >= 0 ? '▲' : '▼'}} ${{a.pct.toFixed(2)}}%` : 's/d';
-    const priceText = a.last !== null ? a.last.toLocaleString('es-ES', {{maximumFractionDigits: a.last >= 1000 ? 0 : (a.last >= 10 ? 2 : 4)}}) : 's/d';
-    card.innerHTML = `
-      <div class="group">${{a.group}}</div>
-      <div class="label">${{a.label}}</div>
-      <div class="price">${{priceText}} <span class="${{pctClass}}">${{pctText}}</span></div>
-      <div class="spark" id="spark-${{i}}"></div>
-    `;
-    grid.appendChild(card);
+  (C.sparks || []).forEach(function (s) {
+    try {
+      Plotly.newPlot('spark-' + s.i, [{
+        y: s.closes, type: 'scatter', mode: 'lines',
+        line: { color: s.up ? '#4caf50' : '#f44336', width: 2 },
+        fill: 'tozeroy', fillcolor: s.up ? 'rgba(76,175,80,0.08)' : 'rgba(244,67,54,0.08)'
+      }], {
+        margin: { l: 0, r: 0, t: 0, b: 0 }, paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+        xaxis: { visible: false }, yaxis: { visible: false }
+      }, { displayModeBar: false, responsive: true });
+    } catch (e) {}
+  });
 
-    if (a.closes && a.closes.length > 1) {{
-      const up = a.closes[a.closes.length - 1] >= a.closes[0];
-      Plotly.newPlot(`spark-${{i}}`, [{{
-        y: a.closes, type: 'scatter', mode: 'lines', line: {{ color: up ? '#4caf50' : '#f44336', width: 2 }},
-        fill: 'tozeroy', fillcolor: up ? 'rgba(76,175,80,0.08)' : 'rgba(244,67,54,0.08)',
-      }}], {{
-        margin: {{ l: 0, r: 0, t: 0, b: 0 }}, paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
-        xaxis: {{ visible: false }}, yaxis: {{ visible: false }},
-      }}, {{ displayModeBar: false, responsive: true }});
-    }}
-  }});
+  var fg = C.fearGreed || {};
+  if (fg.score !== undefined) {
+    try {
+      Plotly.newPlot('fg-gauge', [{
+        type: 'indicator', mode: 'gauge+number', value: fg.score,
+        number: { font: { color: '#e6e6e6' } },
+        gauge: {
+          axis: { range: [0, 100], tickcolor: '#9aa0ab' },
+          bar: { color: '#4FC3F7' }, bgcolor: 'transparent',
+          steps: [
+            { range: [0, 25], color: '#b71c1c' }, { range: [25, 45], color: '#e65100' },
+            { range: [45, 55], color: '#616161' }, { range: [55, 75], color: '#33691e' },
+            { range: [75, 100], color: '#1b5e20' }
+          ]
+        }
+      }], { paper_bgcolor: 'transparent', font: { color: '#e6e6e6' }, margin: { t: 20, b: 10 } },
+         { displayModeBar: false, responsive: true });
+    } catch (e) {}
+  }
 
-  const fg = DATA.fearGreed || {{}};
-  if (fg.score !== undefined) {{
-    Plotly.newPlot('fg-gauge', [{{
-      type: 'indicator', mode: 'gauge+number',
-      value: fg.score,
-      title: {{ text: fg.rating || '', font: {{ color: '#e6e6e6', size: 16 }} }},
-      number: {{ font: {{ color: '#e6e6e6' }} }},
-      gauge: {{
-        axis: {{ range: [0, 100], tickcolor: '#9aa0ab' }},
-        bar: {{ color: '#4FC3F7' }},
-        bgcolor: 'transparent',
-        steps: [
-          {{ range: [0, 25], color: '#b71c1c' }},
-          {{ range: [25, 45], color: '#e65100' }},
-          {{ range: [45, 55], color: '#616161' }},
-          {{ range: [55, 75], color: '#33691e' }},
-          {{ range: [75, 100], color: '#1b5e20' }},
-        ],
-      }},
-    }}], {{ paper_bgcolor: 'transparent', font: {{ color: '#e6e6e6' }}, margin: {{ t: 40, b: 10 }} }},
-       {{ displayModeBar: false, responsive: true }});
-  }}
-
-  if (fg.history && fg.history.length) {{
-    const x = fg.history.map(p => new Date(p[0]));
-    const y = fg.history.map(p => p[1]);
-    Plotly.newPlot('fg-hist', [{{
-      x, y, type: 'scatter', mode: 'lines', line: {{ color: '#FFD54F', width: 2 }},
-    }}], {{
-      title: {{ text: 'Ultimo ano', font: {{ color: '#e6e6e6', size: 13 }} }},
-      paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
-      font: {{ color: '#9aa0ab' }},
-      xaxis: {{ gridcolor: '#262b38' }}, yaxis: {{ range: [0, 100], gridcolor: '#262b38' }},
-      margin: {{ t: 40, l: 30, r: 10, b: 30 }},
-    }}, {{ displayModeBar: false, responsive: true }});
-  }}
-
-  const subGrid = document.getElementById('fg-subindicators');
-  (fg.subindicators || []).forEach(s => {{
-    const card = document.createElement('div');
-    card.className = 'sub-card';
-    card.innerHTML = `<div>${{s.label}}</div><div class="score">${{s.score}} · ${{s.rating}}</div>`;
-    subGrid.appendChild(card);
-  }});
-
-  const newsList = document.getElementById('news-list');
-  if (DATA.news && DATA.news.length) {{
-    // Los titulares vienen de feeds RSS externos: se insertan como texto, nunca como HTML.
-    DATA.news.forEach(n => {{
-      const li = document.createElement('li');
-      const tagSpan = document.createElement('span');
-      tagSpan.textContent = n.tag;
-      const link = document.createElement('a');
-      link.href = (typeof n.link === 'string' && n.link.startsWith('http')) ? n.link : '#';
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      link.textContent = n.title;
-      li.appendChild(tagSpan);
-      li.appendChild(link);
-      newsList.appendChild(li);
-    }});
-  }} else {{
-    const li = document.createElement('li');
-    li.textContent = 'Sin titulares disponibles ahora.';
-    newsList.appendChild(li);
-  }}
+  if (fg.history && fg.history.length) {
+    try {
+      var x = fg.history.map(function (p) { return new Date(p[0]); });
+      var y = fg.history.map(function (p) { return p[1]; });
+      Plotly.newPlot('fg-hist', [{
+        x: x, y: y, type: 'scatter', mode: 'lines', line: { color: '#FFD54F', width: 2 }
+      }], {
+        title: { text: 'Ultimo ano', font: { color: '#e6e6e6', size: 13 } },
+        paper_bgcolor: 'transparent', plot_bgcolor: 'transparent', font: { color: '#9aa0ab' },
+        xaxis: { gridcolor: '#262b38' }, yaxis: { range: [0, 100], gridcolor: '#262b38' },
+        margin: { t: 40, l: 30, r: 10, b: 30 }
+      }, { displayModeBar: false, responsive: true });
+    } catch (e) {}
+  }
+})();
 </script>
 </body>
 </html>
 """
+
+
+def build_html(data, fg, news_items):
+    """Genera docs/index.html con el contenido ya escrito en el HTML (se ve sin JS).
+    Los graficos (Plotly) son una mejora opcional que se anade solo si carga."""
+    today = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+
+    # --- Tarjetas de mercado (renderizadas en el servidor) + datos para los sparklines ---
+    cards = []
+    sparks = []
+    idx = 0
+    for group_name, rows in data:
+        for r in rows:
+            last, pct = r["last"], r["pct"]
+            price_text = "s/d" if math.isnan(last) else format_price(last)
+            if math.isnan(last) or math.isnan(pct):
+                pct_class, pct_text = "", "s/d"
+            else:
+                pct_class = "pct-up" if pct >= 0 else "pct-down"
+                pct_text = f"{'▲' if pct >= 0 else '▼'} {pct:+.2f}%"
+            cards.append(
+                '<div class="card">'
+                f'<div class="group">{html.escape(group_name)}</div>'
+                f'<div class="label">{html.escape(r["label"])}</div>'
+                f'<div class="price">{price_text} <span class="{pct_class}">{pct_text}</span></div>'
+                f'<div class="spark" id="spark-{idx}"></div>'
+                '</div>'
+            )
+            closes = r["closes"]
+            if closes and len(closes) > 1:
+                sparks.append({
+                    "i": idx,
+                    "closes": [round(c, 4) for c in closes],
+                    "up": closes[-1] >= closes[0],
+                })
+            idx += 1
+    cards_html = "\n    ".join(cards)
+
+    # --- Fear & Greed (renderizado en el servidor) ---
+    charts_fg = {}
+    if fg:
+        sub_cards = "\n    ".join(
+            f'<div class="sub-card"><div>{html.escape(s["label"])}</div>'
+            f'<div class="score">{s["score"]} · {html.escape(s["rating"])}</div></div>'
+            for s in fg.get("subindicators", [])
+        )
+        fg_section = (
+            '<div class="fg-summary">'
+            f'<span class="fg-score">{fg["score"]}<span class="fg-max">/100</span></span>'
+            f'<span class="fg-rating">{html.escape(fg["rating"])}</span>'
+            f'<span class="fg-prev">Ayer {fg["previous_close"]} · Semana pasada {fg["previous_1_week"]} · '
+            f'Mes pasado {fg["previous_1_month"]} · Año pasado {fg["previous_1_year"]}</span>'
+            '</div>'
+            '<div class="fg-wrap">'
+            '<div id="fg-gauge" class="fg-gauge"><span class="chart-ph">Medidor (requiere gráficos)</span></div>'
+            '<div id="fg-hist" class="fg-hist"><span class="chart-ph">Histórico (requiere gráficos)</span></div>'
+            '</div>'
+            f'<div class="sub-grid">{sub_cards}</div>'
+        )
+        charts_fg = {"score": fg["score"], "history": fg.get("history", [])}
+    else:
+        fg_section = '<p class="subtitle">Sentimiento no disponible ahora.</p>'
+
+    # --- Titulares (renderizados en el servidor; texto escapado, solo enlaces http) ---
+    if news_items:
+        items = []
+        for n in news_items:
+            link = n.get("link", "")
+            safe_link = link if isinstance(link, str) and link.startswith("http") else "#"
+            items.append(
+                f'<li><span>{html.escape(n["tag"])}</span>'
+                f'<a href="{html.escape(safe_link)}" target="_blank" rel="noopener noreferrer">'
+                f'{html.escape(n["title"])}</a></li>'
+            )
+        news_html = "\n    ".join(items)
+    else:
+        news_html = "<li>Sin titulares disponibles ahora.</li>"
+
+    charts_json = _json_for_html({"sparks": sparks, "fearGreed": charts_fg})
+
+    html_doc = (
+        _HTML_TEMPLATE
+        .replace("__TODAY__", html.escape(today))
+        .replace("__CARDS__", cards_html)
+        .replace("__FG_SECTION__", fg_section)
+        .replace("__NEWS__", news_html)
+        .replace("__CHARTS_JSON__", charts_json)
+    )
+
     os.makedirs(DOCS_DIR, exist_ok=True)
     with open(os.path.join(DOCS_DIR, "index.html"), "w", encoding="utf-8") as f:
-        f.write(html)
+        f.write(html_doc)
 
 
 def run_digest():
