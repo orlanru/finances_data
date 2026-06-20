@@ -12,13 +12,13 @@ Todas las claves se leen de variables de entorno (Secrets), nunca van en el codi
 
 Cada ejecucion:
   1. Envia el resumen en texto y un grafico por Telegram.
-  2. Regenera docs/index.html, un dashboard web con graficos interactivos
-     (se publica solo si GitHub Pages esta activado sobre la carpeta docs/).
+  2. Regenera docs/index.html, un dashboard web con graficos en SVG
+     renderizados en el servidor (sin JS ni CDN externo; se publica solo
+     si GitHub Pages esta activado sobre la carpeta docs/).
 """
 
 import os
 import io
-import json
 import html
 import math
 import datetime
@@ -324,9 +324,100 @@ def send_photo(png_bytes, caption=""):
             print(f"No se pudo enviar el grafico a {chat_id}: {e}")
 
 
-def _json_for_html(obj):
-    """JSON seguro para incrustar dentro de una etiqueta <script>."""
-    return json.dumps(obj, ensure_ascii=False).replace("</", "<\\/")
+def _polar(cx, cy, r, theta_deg):
+    rad = math.radians(theta_deg)
+    return cx + r * math.cos(rad), cy - r * math.sin(rad)
+
+
+def _svg_sparkline(closes, up, width=200, height=50):
+    """Mini grafico de linea en SVG puro (sin JS ni CDN)."""
+    lo, hi = min(closes), max(closes)
+    rng = (hi - lo) or 1.0
+    n = len(closes)
+    pts = [
+        f"{(i / (n - 1)) * width:.1f},{height - ((c - lo) / rng) * height:.1f}"
+        for i, c in enumerate(closes)
+    ]
+    path = " ".join(pts)
+    color = "#4caf50" if up else "#f44336"
+    fill = "rgba(76,175,80,0.12)" if up else "rgba(244,67,54,0.12)"
+    fill_pts = f"0,{height} {path} {width},{height}"
+    return (
+        f'<svg viewBox="0 0 {width} {height}" preserveAspectRatio="none">'
+        f'<polyline points="{fill_pts}" fill="{fill}" stroke="none" />'
+        f'<polyline points="{path}" fill="none" stroke="{color}" stroke-width="2" '
+        'stroke-linejoin="round" stroke-linecap="round" />'
+        '</svg>'
+    )
+
+
+def _gauge_band_path(cx, cy, r, theta_start, theta_end, steps=10):
+    pts = []
+    for i in range(steps + 1):
+        t = theta_start + (theta_end - theta_start) * i / steps
+        x, y = _polar(cx, cy, r, t)
+        pts.append(f"{x:.2f},{y:.2f}")
+    return "M " + " L ".join(pts)
+
+
+def _svg_gauge(score, width=280, height=160):
+    """Medidor Fear & Greed en SVG puro (sin JS ni CDN)."""
+    cx, cy = width / 2, height - 14
+    r = min(width / 2, height) - 24
+    bands = [
+        (0, 25, "#b71c1c"), (25, 45, "#e65100"), (45, 55, "#616161"),
+        (55, 75, "#33691e"), (75, 100, "#1b5e20"),
+    ]
+
+    def theta_of(s):
+        return 180 - (max(0, min(100, s)) / 100) * 180
+
+    parts = [
+        f'<path d="{_gauge_band_path(cx, cy, r, theta_of(s0), theta_of(s1))}" '
+        f'fill="none" stroke="{color}" stroke-width="16" />'
+        for s0, s1, color in bands
+    ]
+    nx, ny = _polar(cx, cy, r - 28, theta_of(score))
+    parts.append(
+        f'<line x1="{cx:.1f}" y1="{cy:.1f}" x2="{nx:.1f}" y2="{ny:.1f}" '
+        'stroke="#e6e6e6" stroke-width="3" stroke-linecap="round" />'
+    )
+    parts.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="6" fill="#e6e6e6" />')
+    parts.append(
+        f'<text x="{cx:.1f}" y="{cy - r * 0.5:.1f}" text-anchor="middle" class="gauge-score">{score}</text>'
+    )
+    parts.append(f'<text x="{cx - r:.1f}" y="{cy + 11:.1f}" text-anchor="middle" class="gauge-tick">0</text>')
+    parts.append(f'<text x="{cx + r:.1f}" y="{cy + 11:.1f}" text-anchor="middle" class="gauge-tick">100</text>')
+    return f'<svg viewBox="0 0 {width} {height}">' + "".join(parts) + '</svg>'
+
+
+def _svg_history_chart(history, width=600, height=220):
+    """Historico Fear & Greed (1 ano) en SVG puro (sin JS ni CDN)."""
+    pad_l, pad_r, pad_t, pad_b = 30, 10, 16, 16
+    w, h = width - pad_l - pad_r, height - pad_t - pad_b
+    xs = [p[0] for p in history]
+    ys = [p[1] for p in history]
+    xr = (xs[-1] - xs[0]) or 1
+    pts = [
+        f"{pad_l + (x - xs[0]) / xr * w:.1f},{pad_t + (1 - y / 100) * h:.1f}"
+        for x, y in zip(xs, ys)
+    ]
+    path = " ".join(pts)
+    grid = []
+    for v in (0, 25, 50, 75, 100):
+        gy = pad_t + (1 - v / 100) * h
+        grid.append(
+            f'<line x1="{pad_l}" y1="{gy:.1f}" x2="{pad_l + w}" y2="{gy:.1f}" stroke="#262b38" />'
+            f'<text x="{pad_l - 6}" y="{gy + 3:.1f}" text-anchor="end" class="chart-axis">{v}</text>'
+        )
+    last_x, last_y = pts[-1].split(",")
+    return (
+        f'<svg viewBox="0 0 {width} {height}">'
+        + "".join(grid)
+        + f'<polyline points="{path}" fill="none" stroke="#FFD54F" stroke-width="2" stroke-linejoin="round" />'
+        + f'<circle cx="{last_x}" cy="{last_y}" r="3.5" fill="#FFD54F" />'
+        + '</svg>'
+    )
 
 
 _HTML_TEMPLATE = """<!DOCTYPE html>
@@ -335,7 +426,6 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dashboard de mercado</title>
-<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
@@ -357,13 +447,16 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
   .pct-up { color: #4caf50; }
   .pct-down { color: #f44336; }
   .spark { height: 50px; margin-top: 6px; }
+  .spark svg, .fg-gauge svg, .fg-hist svg { width: 100%; height: 100%; display: block; }
+  .gauge-score { font-size: 26px; font-weight: 800; fill: #FFD54F; }
+  .gauge-tick, .chart-axis { font-size: 11px; fill: #767d8a; }
   .fg-summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; margin-top: 12px; }
   .fg-score { font-size: 2.6rem; font-weight: 800; color: #FFD54F; line-height: 1; }
   .fg-max { font-size: 1rem; font-weight: 500; color: #767d8a; }
   .fg-rating { font-size: 1.1rem; font-weight: 600; }
   .fg-prev { width: 100%; color: #9aa0ab; font-size: 0.85rem; }
   .fg-wrap { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; margin-top: 16px; }
-  .fg-gauge, .fg-hist { flex: 1 1 320px; min-width: 280px; height: 280px; }
+  .fg-gauge, .fg-hist { flex: 1 1 320px; min-width: 280px; height: 240px; }
   .chart-ph { color: #4a505c; font-size: 0.8rem; }
   .sub-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-top: 12px; }
   .sub-card { background: #171a23; border: 1px solid #262b38; border-radius: 10px; padding: 10px 12px; font-size: 0.85rem; }
@@ -396,80 +489,19 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
     Generado automaticamente cada dia por GitHub Actions ·
     <a href="https://github.com/orlanru/finances_data" target="_blank">codigo fuente</a>
   </footer>
-
-<!-- Todo el contenido de arriba ya esta escrito en el HTML: se ve sin JavaScript.
-     Los graficos de abajo son un extra que solo se anade si Plotly carga. -->
-<script id="charts-data" type="application/json">__CHARTS_JSON__</script>
-<script>
-(function () {
-  if (typeof Plotly === 'undefined') return;   // sin Plotly se sigue viendo todo el texto
-  var C;
-  try { C = JSON.parse(document.getElementById('charts-data').textContent); }
-  catch (e) { return; }
-
-  (C.sparks || []).forEach(function (s) {
-    try {
-      Plotly.newPlot('spark-' + s.i, [{
-        y: s.closes, type: 'scatter', mode: 'lines',
-        line: { color: s.up ? '#4caf50' : '#f44336', width: 2 },
-        fill: 'tozeroy', fillcolor: s.up ? 'rgba(76,175,80,0.08)' : 'rgba(244,67,54,0.08)'
-      }], {
-        margin: { l: 0, r: 0, t: 0, b: 0 }, paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
-        xaxis: { visible: false }, yaxis: { visible: false }
-      }, { displayModeBar: false, responsive: true });
-    } catch (e) {}
-  });
-
-  var fg = C.fearGreed || {};
-  if (fg.score !== undefined) {
-    try {
-      Plotly.newPlot('fg-gauge', [{
-        type: 'indicator', mode: 'gauge+number', value: fg.score,
-        number: { font: { color: '#e6e6e6' } },
-        gauge: {
-          axis: { range: [0, 100], tickcolor: '#9aa0ab' },
-          bar: { color: '#4FC3F7' }, bgcolor: 'transparent',
-          steps: [
-            { range: [0, 25], color: '#b71c1c' }, { range: [25, 45], color: '#e65100' },
-            { range: [45, 55], color: '#616161' }, { range: [55, 75], color: '#33691e' },
-            { range: [75, 100], color: '#1b5e20' }
-          ]
-        }
-      }], { paper_bgcolor: 'transparent', font: { color: '#e6e6e6' }, margin: { t: 20, b: 10 } },
-         { displayModeBar: false, responsive: true });
-    } catch (e) {}
-  }
-
-  if (fg.history && fg.history.length) {
-    try {
-      var x = fg.history.map(function (p) { return new Date(p[0]); });
-      var y = fg.history.map(function (p) { return p[1]; });
-      Plotly.newPlot('fg-hist', [{
-        x: x, y: y, type: 'scatter', mode: 'lines', line: { color: '#FFD54F', width: 2 }
-      }], {
-        title: { text: 'Ultimo ano', font: { color: '#e6e6e6', size: 13 } },
-        paper_bgcolor: 'transparent', plot_bgcolor: 'transparent', font: { color: '#9aa0ab' },
-        xaxis: { gridcolor: '#262b38' }, yaxis: { range: [0, 100], gridcolor: '#262b38' },
-        margin: { t: 40, l: 30, r: 10, b: 30 }
-      }, { displayModeBar: false, responsive: true });
-    } catch (e) {}
-  }
-})();
-</script>
 </body>
 </html>
 """
 
 
 def build_html(data, fg, news_items):
-    """Genera docs/index.html con el contenido ya escrito en el HTML (se ve sin JS).
-    Los graficos (Plotly) son una mejora opcional que se anade solo si carga."""
+    """Genera docs/index.html. Todo -- texto y graficos -- se renderiza en el
+    servidor (HTML + SVG), asi se ve igual en cualquier navegador sin depender
+    de JavaScript ni de CDNs externos."""
     today = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
 
-    # --- Tarjetas de mercado (renderizadas en el servidor) + datos para los sparklines ---
+    # --- Tarjetas de mercado, con sparkline en SVG ---
     cards = []
-    sparks = []
-    idx = 0
     for group_name, rows in data:
         for r in rows:
             last, pct = r["last"], r["pct"]
@@ -479,31 +511,33 @@ def build_html(data, fg, news_items):
             else:
                 pct_class = "pct-up" if pct >= 0 else "pct-down"
                 pct_text = f"{'▲' if pct >= 0 else '▼'} {pct:+.2f}%"
+            closes = r["closes"]
+            if closes and len(closes) > 1:
+                spark_svg = _svg_sparkline(closes, closes[-1] >= closes[0])
+            else:
+                spark_svg = '<span class="chart-ph">Sin datos</span>'
             cards.append(
                 '<div class="card">'
                 f'<div class="group">{html.escape(group_name)}</div>'
                 f'<div class="label">{html.escape(r["label"])}</div>'
                 f'<div class="price">{price_text} <span class="{pct_class}">{pct_text}</span></div>'
-                f'<div class="spark" id="spark-{idx}"></div>'
+                f'<div class="spark">{spark_svg}</div>'
                 '</div>'
             )
-            closes = r["closes"]
-            if closes and len(closes) > 1:
-                sparks.append({
-                    "i": idx,
-                    "closes": [round(c, 4) for c in closes],
-                    "up": closes[-1] >= closes[0],
-                })
-            idx += 1
     cards_html = "\n    ".join(cards)
 
-    # --- Fear & Greed (renderizado en el servidor) ---
-    charts_fg = {}
+    # --- Fear & Greed, con medidor e historico en SVG ---
     if fg:
         sub_cards = "\n    ".join(
             f'<div class="sub-card"><div>{html.escape(s["label"])}</div>'
             f'<div class="score">{s["score"]} · {html.escape(s["rating"])}</div></div>'
             for s in fg.get("subindicators", [])
+        )
+        history = fg.get("history", [])
+        gauge_svg = _svg_gauge(fg["score"])
+        hist_svg = (
+            _svg_history_chart(history) if len(history) > 1
+            else '<span class="chart-ph">Histórico no disponible.</span>'
         )
         fg_section = (
             '<div class="fg-summary">'
@@ -513,12 +547,11 @@ def build_html(data, fg, news_items):
             f'Mes pasado {fg["previous_1_month"]} · Año pasado {fg["previous_1_year"]}</span>'
             '</div>'
             '<div class="fg-wrap">'
-            '<div id="fg-gauge" class="fg-gauge"><span class="chart-ph">Medidor (requiere gráficos)</span></div>'
-            '<div id="fg-hist" class="fg-hist"><span class="chart-ph">Histórico (requiere gráficos)</span></div>'
+            f'<div class="fg-gauge">{gauge_svg}</div>'
+            f'<div class="fg-hist">{hist_svg}</div>'
             '</div>'
             f'<div class="sub-grid">{sub_cards}</div>'
         )
-        charts_fg = {"score": fg["score"], "history": fg.get("history", [])}
     else:
         fg_section = '<p class="subtitle">Sentimiento no disponible ahora.</p>'
 
@@ -537,15 +570,12 @@ def build_html(data, fg, news_items):
     else:
         news_html = "<li>Sin titulares disponibles ahora.</li>"
 
-    charts_json = _json_for_html({"sparks": sparks, "fearGreed": charts_fg})
-
     html_doc = (
         _HTML_TEMPLATE
         .replace("__TODAY__", html.escape(today))
         .replace("__CARDS__", cards_html)
         .replace("__FG_SECTION__", fg_section)
         .replace("__NEWS__", news_html)
-        .replace("__CHARTS_JSON__", charts_json)
     )
 
     os.makedirs(DOCS_DIR, exist_ok=True)
