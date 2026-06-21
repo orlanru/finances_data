@@ -2,10 +2,12 @@ name: Daily market digest
 
 on:
   schedule:
-    # 07:00 UTC = 9:00 en Espana (CEST, UTC+2) en horario de verano.
+    # 07:07 UTC = 9:07 en Espana (CEST, UTC+2) en horario de verano.
     # GitHub Actions no ajusta el cron por horario de invierno/verano:
-    # en horario de invierno (CET, UTC+1) esto se ejecutara a las 8:00.
-    - cron: "0 7 * * *"
+    # en horario de invierno (CET, UTC+1) esto se ejecutara a las 8:07.
+    # Se evita el minuto en punto (":00") porque es cuando mas carga
+    # global tiene GitHub Actions y mas se retrasan los cron.
+    - cron: "7 7 * * *"
   workflow_dispatch: {}
 
 permissions:
